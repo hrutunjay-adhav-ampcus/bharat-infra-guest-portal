@@ -5,8 +5,30 @@ import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, X, Check, AlertTriangle, CheckCircle } from 'lucide-react';
-import { BookingGuest } from '@/types';
+import { Plus, X, Check, CheckCircle } from 'lucide-react';
+import { GuestPickupDrop } from '@/types';
+
+interface GuestRow {
+  name: string;
+  phone: string;
+  company: string;
+  type: 'employee' | 'visitor';
+  empId: string;
+  gender: 'Male' | 'Female';
+  email: string;
+  allocatedRoom: string | null;
+  allocatedSection: string | null;
+  pickup: GuestPickupDrop;
+  drop: GuestPickupDrop;
+}
+
+const emptyPickupDrop = (): GuestPickupDrop => ({ enabled: false, location: '', date: '', time: '', vehicle: 'Car', notes: '' });
+
+const emptyGuest = (): GuestRow => ({
+  name: '', phone: '', company: '', type: 'employee', empId: '', gender: 'Male', email: '',
+  allocatedRoom: null, allocatedSection: null,
+  pickup: emptyPickupDrop(), drop: emptyPickupDrop(),
+});
 
 export default function ManagerNewBooking() {
   const { selectedGHId, rooms, settings, setBookings, setRooms, guestHouses, bookings } = useApp();
@@ -14,16 +36,12 @@ export default function ManagerNewBooking() {
   const gh = guestHouses.find(g => g.id === selectedGHId);
   const ghRooms = rooms.filter(r => r.ghId === selectedGHId);
 
-  const [guests, setGuests] = useState<Partial<BookingGuest>[]>([
-    { name: '', phone: '', company: '', type: 'employee', empId: '', gender: 'Male', email: '', allocatedRoom: null, allocatedSection: null }
-  ]);
+  const [guests, setGuests] = useState<GuestRow[]>([emptyGuest()]);
   const [checkinDate, setCheckinDate] = useState('');
   const [checkinTime, setCheckinTime] = useState(settings.checkinTime);
   const [checkoutDate, setCheckoutDate] = useState('');
   const [checkoutTime, setCheckoutTime] = useState(settings.checkoutTime);
   const [selectedSections, setSelectedSections] = useState<{ roomId: string; sectionId: string }[]>([]);
-  const [pickup, setPickup] = useState({ enabled: false, location: '', date: '', time: '', vehicle: 'Car' });
-  const [drop, setDrop] = useState({ enabled: false, location: '', date: '', time: '', vehicle: 'Car' });
   const [purpose, setPurpose] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
@@ -38,8 +56,26 @@ export default function ManagerNewBooking() {
     }))
   );
 
-  const addGuest = () => setGuests([...guests, { name: '', phone: '', company: '', type: 'employee', empId: '', gender: 'Male', email: '', allocatedRoom: null, allocatedSection: null }]);
+  const addGuest = () => setGuests([...guests, emptyGuest()]);
   const removeGuest = (i: number) => guests.length > 1 && setGuests(guests.filter((_, idx) => idx !== i));
+
+  const updateGuest = (i: number, updates: Partial<GuestRow>) => {
+    const u = [...guests];
+    u[i] = { ...u[i], ...updates };
+    setGuests(u);
+  };
+
+  const updateGuestPickup = (i: number, updates: Partial<GuestPickupDrop>) => {
+    const u = [...guests];
+    u[i] = { ...u[i], pickup: { ...u[i].pickup, ...updates } };
+    setGuests(u);
+  };
+
+  const updateGuestDrop = (i: number, updates: Partial<GuestPickupDrop>) => {
+    const u = [...guests];
+    u[i] = { ...u[i], drop: { ...u[i].drop, ...updates } };
+    setGuests(u);
+  };
 
   const toggleSection = (roomId: string, sectionId: string) => {
     const exists = selectedSections.find(s => s.roomId === roomId && s.sectionId === sectionId);
@@ -56,8 +92,10 @@ export default function ManagerNewBooking() {
     if (nights <= 0) return false;
     if (selectedSections.length === 0) return false;
     if (guests.some(g => !g.allocatedRoom || !g.allocatedSection)) return false;
-    if (pickup.enabled && (!pickup.location || !pickup.date || !pickup.time)) return false;
-    if (drop.enabled && (!drop.location || !drop.date || !drop.time)) return false;
+    for (const g of guests) {
+      if (g.pickup.enabled && (!g.pickup.location || !g.pickup.date || !g.pickup.time)) return false;
+      if (g.drop.enabled && (!g.drop.location || !g.drop.date || !g.drop.time)) return false;
+    }
     return true;
   };
 
@@ -69,24 +107,25 @@ export default function ManagerNewBooking() {
       ref,
       ghId: selectedGHId,
       guests: guests.map(g => ({
-        name: g.name!, phone: g.phone!, company: g.company || '', type: g.type! as 'employee' | 'visitor',
-        empId: g.empId || null, gender: g.gender! as 'Male' | 'Female', email: g.email || '',
+        name: g.name, phone: g.phone, company: g.company || '', type: g.type,
+        empId: g.empId || null, gender: g.gender, email: g.email || '',
         allocatedRoom: g.allocatedRoom!, allocatedSection: g.allocatedSection!,
+        pickup: g.pickup.enabled ? g.pickup : { enabled: false as const },
+        drop: g.drop.enabled ? g.drop : { enabled: false as const },
       })),
       checkin: `${checkinDate}T${checkinTime}`,
       checkout: `${checkoutDate}T${checkoutTime}`,
       nights,
       status: 'pending' as const,
       pendingExpiresAt: Date.now() + settings.bookingExpiryHours * 3600000,
-      pickup: pickup.enabled ? pickup : { enabled: false },
-      drop: drop.enabled ? drop : { enabled: false },
+      pickup: { enabled: false } as const,
+      drop: { enabled: false } as const,
       purpose,
       emailSent: false,
       occupancyType: 'single_section',
     };
 
     setBookings(prev => [...prev, newBooking]);
-    // Mark sections as pending_approval
     setRooms(prev => prev.map(room => ({
       ...room,
       sections: room.sections.map(s => {
@@ -122,7 +161,6 @@ export default function ManagerNewBooking() {
       <h1 className="text-2xl font-bold mb-6">New Booking — {gh?.name}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left - Guest Info */}
         <div className="bg-card rounded-[10px] border border-border p-5">
           <h3 className="font-semibold mb-4">Guest Information</h3>
           {guests.map((g, i) => (
@@ -130,9 +168,7 @@ export default function ManagerNewBooking() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Guest {i + 1}</span>
                 <div className="flex items-center gap-2">
-                  <select className="text-xs border border-border rounded px-2 py-1" value={g.type} onChange={e => {
-                    const updated = [...guests]; updated[i] = { ...updated[i], type: e.target.value as any }; setGuests(updated);
-                  }}>
+                  <select className="text-xs border border-border rounded px-2 py-1" value={g.type} onChange={e => updateGuest(i, { type: e.target.value as any })}>
                     <option value="employee">Employee</option>
                     <option value="visitor">Visitor</option>
                   </select>
@@ -140,22 +176,72 @@ export default function ManagerNewBooking() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Full Name *" value={g.name || ''} onChange={e => { const u = [...guests]; u[i] = { ...u[i], name: e.target.value }; setGuests(u); }} />
-                <Input placeholder="Phone *" value={g.phone || ''} onChange={e => { const u = [...guests]; u[i] = { ...u[i], phone: e.target.value }; setGuests(u); }} />
-                <Input placeholder="Email" value={g.email || ''} onChange={e => { const u = [...guests]; u[i] = { ...u[i], email: e.target.value }; setGuests(u); }} />
-                <Input placeholder={g.type === 'employee' ? 'Employee ID' : 'Visitor ID'} value={g.empId || ''} onChange={e => { const u = [...guests]; u[i] = { ...u[i], empId: e.target.value }; setGuests(u); }} />
-                <Input placeholder="Company/Dept" value={g.company || ''} onChange={e => { const u = [...guests]; u[i] = { ...u[i], company: e.target.value }; setGuests(u); }} />
-                <select className="border border-border rounded-md px-3 py-2 text-sm" value={g.gender} onChange={e => { const u = [...guests]; u[i] = { ...u[i], gender: e.target.value as any }; setGuests(u); }}>
+                <Input placeholder="Full Name *" value={g.name} onChange={e => updateGuest(i, { name: e.target.value })} />
+                <Input placeholder="Phone *" value={g.phone} onChange={e => updateGuest(i, { phone: e.target.value })} />
+                <Input placeholder="Email" value={g.email} onChange={e => updateGuest(i, { email: e.target.value })} />
+                <Input placeholder={g.type === 'employee' ? 'Employee ID' : 'Visitor ID'} value={g.empId} onChange={e => updateGuest(i, { empId: e.target.value })} />
+                <Input placeholder="Company/Dept" value={g.company} onChange={e => updateGuest(i, { company: e.target.value })} />
+                <select className="border border-border rounded-md px-3 py-2 text-sm" value={g.gender} onChange={e => updateGuest(i, { gender: e.target.value as any })}>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                 </select>
+              </div>
+
+              {/* Per-guest Pickup & Drop */}
+              <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600 w-16">Pickup</label>
+                  <button
+                    type="button"
+                    onClick={() => updateGuestPickup(i, { enabled: !g.pickup.enabled })}
+                    className={`text-xs px-2 py-1 rounded border ${g.pickup.enabled ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
+                  >
+                    {g.pickup.enabled ? 'Yes' : 'No'}
+                  </button>
+                </div>
+                {g.pickup.enabled && (
+                  <div className="grid grid-cols-2 gap-2 ml-[72px]">
+                    <Input placeholder="Pickup location *" value={g.pickup.location || ''} onChange={e => updateGuestPickup(i, { location: e.target.value })} className="col-span-2" />
+                    <Input type="date" value={g.pickup.date || ''} onChange={e => updateGuestPickup(i, { date: e.target.value })} />
+                    <Input type="time" value={g.pickup.time || ''} onChange={e => updateGuestPickup(i, { time: e.target.value })} />
+                    <select className="border border-border rounded-md px-3 py-2 text-sm" value={g.pickup.vehicle || 'Car'} onChange={e => updateGuestPickup(i, { vehicle: e.target.value })}>
+                      <option>Car</option><option>Van</option><option>Bus</option><option>Auto-arrange</option>
+                    </select>
+                    <Input placeholder="Notes (optional)" value={g.pickup.notes || ''} onChange={e => updateGuestPickup(i, { notes: e.target.value })} />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600 w-16">Drop</label>
+                  <button
+                    type="button"
+                    onClick={() => updateGuestDrop(i, { enabled: !g.drop.enabled })}
+                    className={`text-xs px-2 py-1 rounded border ${g.drop.enabled ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
+                  >
+                    {g.drop.enabled ? 'Yes' : 'No'}
+                  </button>
+                </div>
+                {g.drop.enabled && (
+                  <div className="grid grid-cols-2 gap-2 ml-[72px]">
+                    <Input placeholder="Drop location *" value={g.drop.location || ''} onChange={e => updateGuestDrop(i, { location: e.target.value })} className="col-span-2" />
+                    <Input type="date" value={g.drop.date || ''} onChange={e => updateGuestDrop(i, { date: e.target.value })} />
+                    <Input type="time" value={g.drop.time || ''} onChange={e => updateGuestDrop(i, { time: e.target.value })} />
+                    <select className="border border-border rounded-md px-3 py-2 text-sm" value={g.drop.vehicle || 'Car'} onChange={e => updateGuestDrop(i, { vehicle: e.target.value })}>
+                      <option>Car</option><option>Van</option><option>Bus</option><option>Auto-arrange</option>
+                    </select>
+                    <Input placeholder="Notes (optional)" value={g.drop.notes || ''} onChange={e => updateGuestDrop(i, { notes: e.target.value })} />
+                  </div>
+                )}
+
+                {g.pickup.enabled && g.drop.enabled && g.pickup.location && g.drop.location && g.pickup.location === g.drop.location && (
+                  <p className="text-xs text-amber-600 ml-[72px]">⚠ Pickup and drop location are the same</p>
+                )}
               </div>
             </div>
           ))}
           <Button variant="outline" onClick={addGuest} className="gap-1"><Plus className="h-4 w-4" /> Add Guest</Button>
         </div>
 
-        {/* Right - Schedule & Rooms */}
         <div className="bg-card rounded-[10px] border border-border p-5">
           <h3 className="font-semibold mb-4">Rooms & Schedule</h3>
 
@@ -196,7 +282,7 @@ export default function ManagerNewBooking() {
                   <select className="border border-border rounded-md px-2 py-1 text-sm" value={`${g.allocatedRoom}|${g.allocatedSection}`}
                     onChange={e => {
                       const [roomId, sectionId] = e.target.value.split('|');
-                      const u = [...guests]; u[i] = { ...u[i], allocatedRoom: roomId, allocatedSection: sectionId }; setGuests(u);
+                      updateGuest(i, { allocatedRoom: roomId, allocatedSection: sectionId });
                     }}>
                     <option value="|">Select section</option>
                     {selectedSections.map(ss => {
@@ -208,42 +294,6 @@ export default function ManagerNewBooking() {
               ))}
             </div>
           )}
-
-          {/* Pickup */}
-          <div className="mb-4">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" checked={pickup.enabled} onChange={e => setPickup({ ...pickup, enabled: e.target.checked })} />
-              Pickup Required
-            </label>
-            {pickup.enabled && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <Input placeholder="Location *" value={pickup.location} onChange={e => setPickup({ ...pickup, location: e.target.value })} />
-                <Input type="date" value={pickup.date} onChange={e => setPickup({ ...pickup, date: e.target.value })} />
-                <Input type="time" value={pickup.time} onChange={e => setPickup({ ...pickup, time: e.target.value })} />
-                <select className="border border-border rounded-md px-3 py-2 text-sm" value={pickup.vehicle} onChange={e => setPickup({ ...pickup, vehicle: e.target.value })}>
-                  <option>Car</option><option>Van</option><option>Bus</option><option>Auto-arrange</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Drop */}
-          <div className="mb-4">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" checked={drop.enabled} onChange={e => setDrop({ ...drop, enabled: e.target.checked })} />
-              Drop Required
-            </label>
-            {drop.enabled && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <Input placeholder="Location *" value={drop.location} onChange={e => setDrop({ ...drop, location: e.target.value })} />
-                <Input type="date" value={drop.date} onChange={e => setDrop({ ...drop, date: e.target.value })} />
-                <Input type="time" value={drop.time} onChange={e => setDrop({ ...drop, time: e.target.value })} />
-                <select className="border border-border rounded-md px-3 py-2 text-sm" value={drop.vehicle} onChange={e => setDrop({ ...drop, vehicle: e.target.value })}>
-                  <option>Car</option><option>Van</option><option>Bus</option><option>Auto-arrange</option>
-                </select>
-              </div>
-            )}
-          </div>
 
           <div className="mb-4">
             <Label>Purpose</Label>

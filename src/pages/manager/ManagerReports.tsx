@@ -6,12 +6,14 @@ import { Calendar, BedDouble, Wrench, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import SortDropdown, { sortData } from '@/components/SortDropdown';
 
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#14b8a6'];
 
 export default function ManagerReports() {
   const { selectedGHId, rooms, bookings, tickets, guestHouses } = useApp();
   const [tab, setTab] = useState<'booking' | 'occupancy' | 'maintenance' | 'summary'>('booking');
+  const [sort, setSort] = useState('date_desc');
   const tabs = ['booking', 'occupancy', 'maintenance', 'summary'] as const;
 
   const ghRooms = rooms.filter(r => r.ghId === selectedGHId);
@@ -32,18 +34,24 @@ export default function ManagerReports() {
     return resolved.length > 0 ? Math.round(resolved.reduce((a, t) => a + (t.resolutionHours || 0), 0) / resolved.length) : 0;
   })();
 
+  const sortedBookings = sortData(ghBookings, sort);
+  const sortedTickets = sortData(ghTickets, sort);
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-1">Reports</h1>
       <p className="text-sm text-muted-foreground mb-6">{gh?.name}</p>
 
-      <div className="flex gap-2 mb-6">
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${tab === t ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}>
-            {t === 'booking' ? 'Booking Report' : t === 'occupancy' ? 'Occupancy Report' : t === 'maintenance' ? 'Maintenance Report' : 'Summary'}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+        <div className="flex gap-2">
+          {tabs.map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${tab === t ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}>
+              {t === 'booking' ? 'Booking Report' : t === 'occupancy' ? 'Occupancy Report' : t === 'maintenance' ? 'Maintenance Report' : 'Summary'}
+            </button>
+          ))}
+        </div>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {tab === 'booking' && (
@@ -62,7 +70,7 @@ export default function ManagerReports() {
                 <th className="text-left px-4 py-3">Status</th>
               </tr></thead>
               <tbody>
-                {ghBookings.map(b => (
+                {sortedBookings.map(b => (
                   <tr key={b.ref} className="border-t border-border">
                     <td className="px-4 py-2">{b.ref}</td>
                     <td className="px-4 py-2">{b.guests.map(g => g.name).join(', ')}</td>
@@ -145,7 +153,7 @@ export default function ManagerReports() {
                 <th className="text-left px-4 py-3">Reported</th><th className="text-left px-4 py-3">Resolved</th><th className="text-left px-4 py-3">Hours</th>
               </tr></thead>
               <tbody>
-                {ghTickets.map(t => (
+                {sortedTickets.map(t => (
                   <tr key={t.id} className="border-t border-border">
                     <td className="px-4 py-2">{rooms.find(r => r.id === t.roomId)?.number}-{t.sectionId}</td>
                     <td className="px-4 py-2"><CategoryBadge category={t.category} /></td>

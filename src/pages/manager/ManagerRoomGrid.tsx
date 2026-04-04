@@ -138,7 +138,7 @@ export default function ManagerRoomGrid() {
           ))}
         </div>
 
-        <div className="grid grid-cols-4 gap-3 relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative">
           {filteredRooms.map(room => (
             <div key={room.id} className="relative">
               <RoomCard room={room} tickets={ghTickets} onClick={handleRoomClick} />
@@ -165,7 +165,6 @@ export default function ManagerRoomGrid() {
         </div>
       </div>
 
-      {/* Right Drawer */}
       {drawer && section && (
         <div className="fixed right-0 top-0 h-full w-[380px] bg-card border-l border-border shadow-lg z-40 overflow-auto">
           <div className="p-5">

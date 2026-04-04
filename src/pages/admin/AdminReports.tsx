@@ -6,40 +6,46 @@ import { BarChart3, Calendar, Wrench, BedDouble, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import SortDropdown, { sortData } from '@/components/SortDropdown';
 
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#14b8a6'];
 
 export default function AdminReports() {
   const { guestHouses, rooms, bookings, tickets } = useApp();
   const [tab, setTab] = useState<'overview' | 'occupancy' | 'maintenance' | 'bookings'>('overview');
+  const [sort, setSort] = useState('date_desc');
   const tabs = ['overview', 'occupancy', 'maintenance', 'bookings'] as const;
 
   const download = (type: string) => toast.success(`${type} report downloaded`);
 
-  // Overview data
   const bookingsPerGH = guestHouses.map(gh => ({
     name: gh.name.split(' ')[0],
     bookings: bookings.filter(b => b.ghId === gh.id).length,
   }));
 
-  // Maintenance by category
   const categories = Array.from(new Set(tickets.map(t => t.category)));
   const maintenanceByCategory = categories.map(cat => ({
     name: cat,
     value: tickets.filter(t => t.category === cat).length,
   }));
 
+  const sortedBookings = sortData(bookings, sort);
+  const sortedTickets = sortData(tickets, sort);
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Reports</h1>
 
-      <div className="flex gap-2 mb-6">
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${tab === t ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}>
-            {t}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-2">
+          {tabs.map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-md text-sm font-medium capitalize ${tab === t ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {tab === 'overview' && (
@@ -131,7 +137,7 @@ export default function AdminReports() {
                 <th className="text-left px-4 py-3">Reported</th><th className="text-left px-4 py-3">Resolved</th><th className="text-left px-4 py-3">Hours</th>
               </tr></thead>
               <tbody>
-                {tickets.map(t => {
+                {sortedTickets.map(t => {
                   const room = rooms.find(r => r.id === t.roomId);
                   return (
                     <tr key={t.id} className="border-t border-border">
@@ -160,7 +166,7 @@ export default function AdminReports() {
               <th className="text-left px-4 py-3">Status</th>
             </tr></thead>
             <tbody>
-              {bookings.map(b => {
+              {sortedBookings.map(b => {
                 const gh = guestHouses.find(g => g.id === b.ghId);
                 return (
                   <tr key={b.ref} className="border-t border-border">
