@@ -1,4 +1,5 @@
 import { Room, RoomSection, MaintenanceTicket } from '@/types';
+import Bed from './Bed';
 
 const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   available: { bg: '#E1F5EE', border: '#5DCAA5', text: '#085041', dot: '#1D9E75' },
@@ -55,42 +56,52 @@ export default function RoomCard({ room, tickets, onClick }: RoomCardProps) {
 
   return (
     <div
-      className="rounded-lg cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
-      style={{ border: `2px solid ${borderColor}`, minHeight: '80px' }}
+      className="rounded-lg cursor-pointer hover:shadow-md transition-shadow overflow-hidden p-6"
+      style={{ border: `2px solid ${borderColor}`, minHeight: '180px' }}
       onClick={handleClick}
     >
-      <div className="flex h-[52px]">
+      <div className="flex" style={{ minHeight: '100px' }}>
         {room.sections.map((section, i) => {
           const style = STATUS_STYLES[section.status] || STATUS_STYLES.available;
           const content = getSectionContent(section, tickets?.filter(t => t.roomId === room.id));
           const isPending = section.status === 'pending_approval';
+          const bedType = section.bedType || 'single';
 
           return (
             <div
               key={section.sectionId}
-              className={`flex-1 relative px-1.5 py-1.5 flex flex-col items-center justify-center ${isPending ? 'cursor-not-allowed' : ''}`}
+              className={`flex-1 relative px-2 py-2 flex flex-col items-center justify-center ${isPending ? 'cursor-not-allowed' : ''}`}
               style={{
                 backgroundColor: style.bg,
                 borderRight: i < room.sections.length - 1 ? '1px solid #94a3b8' : 'none',
               }}
               title={isPending ? 'Awaiting admin approval' : undefined}
             >
-              <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: style.dot }} />
+              <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: style.dot }} />
               {room.bhkCount > 1 && (
-                <span className="text-[9px] font-medium leading-none" style={{ color: style.text }}>
+                <span className="text-sm font-medium leading-none" style={{ color: style.text }}>
                   {room.number}-{section.label}
                 </span>
               )}
-              <span className="text-[10px] font-semibold leading-tight mt-0.5" style={{ color: style.text }}>
+              <span className="text-sm font-semibold leading-tight mt-0.5" style={{ color: style.text }}>
                 {content}
               </span>
+              <div className="flex justify-center gap-1 mt-2">
+                {bedType === 'single' && <Bed />}
+                {bedType === 'double' && (
+                  <>
+                    <Bed />
+                    <Bed />
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="text-center py-1 border-t" style={{ borderColor: '#e2e8f0', backgroundColor: 'white' }}>
-        <span className="text-xs font-bold text-foreground">{room.number}</span>
-        <span className="text-[10px] text-muted-foreground ml-1">{room.bhkCount}BHK</span>
+      <div className="text-center py-1.5 border-t" style={{ borderColor: '#e2e8f0', backgroundColor: 'white' }}>
+        <span className="text-xl font-bold text-foreground">{room.number}</span>
+        <span className="text-sm text-gray-500 ml-1">{room.bhkCount}BHK</span>
       </div>
     </div>
   );

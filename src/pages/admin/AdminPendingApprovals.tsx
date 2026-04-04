@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import SortDropdown, { sortData } from '@/components/SortDropdown';
 
 export default function AdminPendingApprovals() {
   const { bookings, setBookings, rooms, setRooms, guestHouses, managers } = useApp();
@@ -11,11 +12,13 @@ export default function AdminPendingApprovals() {
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [countdowns, setCountdowns] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState('date_desc');
 
   const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const filtered = filter === 'expiring'
+  const filterApplied = filter === 'expiring'
     ? pendingBookings.filter(b => b.pendingExpiresAt && (b.pendingExpiresAt - Date.now()) < 3600000)
     : pendingBookings;
+  const filtered = sortData(filterApplied, sort);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -80,16 +83,19 @@ export default function AdminPendingApprovals() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Pending Approvals</h1>
 
-      <div className="flex gap-2 mb-4">
-        {(['all', 'expiring'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${filter === f ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}
-          >
-            {f === 'all' ? 'All Pending' : 'Expiring Soon (<1hr)'}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-2">
+          {(['all', 'expiring'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${filter === f ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}
+            >
+              {f === 'all' ? 'All Pending' : 'Expiring Soon (<1hr)'}
+            </button>
+          ))}
+        </div>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {filtered.length === 0 ? (

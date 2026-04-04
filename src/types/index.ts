@@ -39,6 +39,16 @@ export interface RoomSection {
   status: 'available' | 'booked' | 'occupied' | 'pending_approval' | 'maintenance';
   guestName: string | null;
   bookingRef: string | null;
+  bedType?: 'single' | 'double';
+}
+
+export interface GuestPickupDrop {
+  enabled: boolean;
+  location?: string;
+  date?: string;
+  time?: string;
+  vehicle?: string;
+  notes?: string;
 }
 
 export interface Room {
@@ -63,6 +73,8 @@ export interface BookingGuest {
   email: string;
   allocatedRoom: string | null;
   allocatedSection: string | null;
+  pickup?: GuestPickupDrop;
+  drop?: GuestPickupDrop;
 }
 
 export interface PickupDrop {

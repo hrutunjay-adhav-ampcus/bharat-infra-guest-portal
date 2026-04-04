@@ -5,6 +5,7 @@ import { Building2, Users, BedDouble, ClipboardCheck, ChevronDown, ChevronUp, Ch
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import SortDropdown, { sortData } from '@/components/SortDropdown';
 
 export default function AdminDashboard() {
   const { guestHouses, managers, rooms, bookings, setBookings, setRooms } = useApp();
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [countdowns, setCountdowns] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState('date_desc');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -79,6 +81,8 @@ export default function AdminDashboard() {
     return managers.find(m => m.id === gh?.managerId);
   };
 
+  const sortedPending = sortData(pendingBookings, sort);
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-foreground mb-6">Admin Dashboard</h1>
@@ -90,12 +94,15 @@ export default function AdminDashboard() {
         <StatCard title="Pending Approvals" value={pendingBookings.length} icon={ClipboardCheck} color="#f59e0b" badge={pendingBookings.length} />
       </div>
 
-      <h2 className="text-lg font-semibold mb-4">Pending Booking Requests</h2>
-      {pendingBookings.length === 0 ? (
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">Pending Booking Requests</h2>
+        <SortDropdown value={sort} onChange={setSort} />
+      </div>
+      {sortedPending.length === 0 ? (
         <div className="bg-card rounded-[10px] border border-border p-8 text-center text-muted-foreground">No pending requests</div>
       ) : (
         <div className="space-y-4 mb-8">
-          {pendingBookings.map(booking => {
+          {sortedPending.map(booking => {
             const mgr = getGHManager(booking.ghId);
             const gh = guestHouses.find(g => g.id === booking.ghId);
             const countdown = countdowns[booking.ref] || '';
@@ -182,7 +189,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* GH Summary Table */}
       <h2 className="text-lg font-semibold mb-4">Guest House Summary</h2>
       <div className="bg-card rounded-[10px] border border-border overflow-hidden">
         <table className="w-full text-sm">
@@ -220,7 +226,6 @@ export default function AdminDashboard() {
         </table>
       </div>
 
-      {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card rounded-[10px] p-6 w-full max-w-md">

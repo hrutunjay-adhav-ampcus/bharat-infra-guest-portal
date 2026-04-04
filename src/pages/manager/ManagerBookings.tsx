@@ -2,7 +2,7 @@ import { useApp } from '@/context/AppContext';
 import { BookingStatusBadge } from '@/components/StatusBadges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Eye, X, Check, ArrowDown } from 'lucide-react';
+import { Search, Plus, Eye, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ export default function ManagerBookings() {
   const [search, setSearch] = useState('');
   const [expandedRef, setExpandedRef] = useState<string | null>(null);
   const [countdowns, setCountdowns] = useState<Record<string, string>>({});
+  const [previewOpenForRef, setPreviewOpenForRef] = useState<string | null>(null);
 
   const ghBookings = bookings.filter(b => b.ghId === selectedGHId);
   const filtered = ghBookings
@@ -90,26 +91,41 @@ export default function ManagerBookings() {
     toast.success('Booking cancelled');
   };
 
-  const showEmailPreview = (ref: string) => {
+  const renderEmailPreview = (ref: string) => {
     const booking = bookings.find(b => b.ref === ref);
-    if (!booking) return;
+    if (!booking) return null;
     const gh = guestHouses.find(g => g.id === booking.ghId);
     const mgr = managers.find(m => m.id === gh?.managerId);
-    toast(
-      <div className="text-xs space-y-1">
-        <p className="font-bold">Subject: Booking Confirmation — {gh?.name} | Ref: {booking.ref}</p>
-        <p>Guest: {booking.guests[0]?.name}</p>
-        <p>Guest House: {gh?.name}, {gh?.address}</p>
-        <p>Room: {booking.guests.map(g => `${rooms.find(r => r.id === g.allocatedRoom)?.number}-${g.allocatedSection}`).join(', ')}</p>
-        <p>Check-in: {booking.checkin} | Check-out: {booking.checkout}</p>
-        {booking.pickup.enabled && <p>Pickup: {booking.pickup.location} at {booking.pickup.time}</p>}
-        {booking.drop.enabled && <p>Drop: {booking.drop.location} at {booking.drop.time}</p>}
-        <hr />
-        <p className="whitespace-pre-line">{settings.dosAndDonts}</p>
-        <p>Manager: {mgr?.name} · {mgr?.phone}</p>
-        <p className="text-muted-foreground">Sent by Bharat Infra Corp Guest House Management System</p>
-      </div>,
-      { duration: 10000 }
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="bg-card rounded-[10px] border border-border p-6 w-full max-w-lg max-h-[80vh] overflow-auto relative">
+          <button
+            onClick={() => setPreviewOpenForRef(null)}
+            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg"
+          >
+            ×
+          </button>
+          <h3 className="font-semibold mb-4">Email Preview — {booking.ref}</h3>
+          <div className="text-sm space-y-2">
+            <p className="font-bold">Subject: Booking Confirmation — {gh?.name} | Ref: {booking.ref}</p>
+            {booking.guests.map((g, i) => (
+              <div key={i} className="border-b border-border pb-2">
+                <p>Guest: {g.name}</p>
+                <p>Guest House: {gh?.name}, {gh?.address}</p>
+                <p>Room: {rooms.find(r => r.id === g.allocatedRoom)?.number}-{g.allocatedSection}</p>
+                <p>Check-in: {booking.checkin} | Check-out: {booking.checkout}</p>
+                {g.pickup?.enabled && <p>Pickup: {g.pickup.location} at {g.pickup.time}. Vehicle: {g.pickup.vehicle}</p>}
+                {g.drop?.enabled && <p>Drop: {g.drop.location} at {g.drop.time}. Vehicle: {g.drop.vehicle}</p>}
+              </div>
+            ))}
+            <hr />
+            <p className="whitespace-pre-line">{settings.dosAndDonts}</p>
+            <p>Manager: {mgr?.name} · {mgr?.phone}</p>
+            <p className="text-muted-foreground">Sent by Bharat Infra Corp Guest House Management System</p>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -180,15 +196,21 @@ export default function ManagerBookings() {
                             <div key={i}>
                               <span className="font-medium">{g.name}</span> · {g.phone} · {g.company} · {g.type}
                               · Room {rooms.find(r => r.id === g.allocatedRoom)?.number}-{g.allocatedSection}
+                              {g.pickup?.enabled && <span className="text-xs text-blue-600 ml-2">📍 Pickup: {g.pickup.location} at {g.pickup.time}</span>}
+                              {g.drop?.enabled && <span className="text-xs text-amber-600 ml-2">📍 Drop: {g.drop.location} at {g.drop.time}</span>}
                             </div>
                           ))}
                         </div>
                         <p>Purpose: {b.purpose}</p>
-                        {b.pickup.enabled && <p>Pickup: {b.pickup.location} at {b.pickup.time} ({b.pickup.vehicle})</p>}
-                        {b.drop.enabled && <p>Drop: {b.drop.location} at {b.drop.time} ({b.drop.vehicle})</p>}
                         {b.rejectionReason && <div className="p-2 rounded" style={{ backgroundColor: '#FCEBEB', color: '#501313' }}>Rejected: {b.rejectionReason}</div>}
                         {b.cancellationReason && <div className="p-2 rounded bg-muted">Cancelled: {b.cancellationReason}</div>}
-                        <Button variant="outline" size="sm" onClick={() => showEmailPreview(b.ref)}>Preview Email</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPreviewOpenForRef(previewOpenForRef === b.ref ? null : b.ref)}
+                        >
+                          {previewOpenForRef === b.ref ? 'Close Preview' : 'Preview Email'}
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -198,6 +220,8 @@ export default function ManagerBookings() {
           </tbody>
         </table>
       </div>
+
+      {previewOpenForRef && renderEmailPreview(previewOpenForRef)}
     </div>
   );
 }

@@ -4,10 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, Edit, Eye, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function AdminGuestHouses() {
   const { guestHouses, setGuestHouses, managers, setManagers, rooms } = useApp();
+  const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', city: '', address: '', floors: 1, managerId: '', status: 'active' as 'active' | 'inactive' });
@@ -35,7 +37,6 @@ export default function AdminGuestHouses() {
     if (editId) {
       const oldGH = guestHouses.find(g => g.id === editId);
       if (oldGH && oldGH.managerId !== form.managerId) {
-        // Remove GH from old manager
         setManagers(prev => prev.map(m => {
           if (m.id === oldGH.managerId) return { ...m, assignedGHs: m.assignedGHs.filter(id => id !== editId) };
           if (m.id === form.managerId) return { ...m, assignedGHs: [...m.assignedGHs, editId] };
@@ -90,7 +91,7 @@ export default function AdminGuestHouses() {
                 <Button variant="outline" size="sm" onClick={() => openEdit(gh.id)} className="gap-1">
                   <Edit className="h-3 w-3" /> Edit
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1">
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/admin/room-layout-builder?ghId=${gh.id}`)}>
                   <Eye className="h-3 w-3" /> View Layout
                 </Button>
               </div>
