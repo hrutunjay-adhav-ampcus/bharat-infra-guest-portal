@@ -73,6 +73,8 @@ export interface BookingGuest {
   email: string;
   allocatedRoom: string | null;
   allocatedSection: string | null;
+  pickup?: GuestPickupDrop;
+  drop?: GuestPickupDrop;
 }
 
 export interface PickupDrop {
