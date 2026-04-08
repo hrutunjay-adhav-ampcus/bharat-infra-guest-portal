@@ -47,7 +47,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback((role: 'admin' | 'manager', email: string, password: string): boolean => {
     if (role === 'admin') {
-      if (email === 'admin@company.com' && password === 'admin123') {
+      const adminPwd = localStorage.getItem('ghms_admin_password') || 'admin123';
+      if (email === 'admin@company.com' && password === adminPwd) {
         const u: AuthUser = { role: 'admin', userId: 'admin' };
         setUser(u);
         localStorage.setItem('ghms_user', JSON.stringify(u));
