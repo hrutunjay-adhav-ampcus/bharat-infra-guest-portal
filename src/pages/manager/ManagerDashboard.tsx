@@ -1,6 +1,5 @@
 import { useApp } from '@/context/AppContext';
 import StatCard from '@/components/StatCard';
-import { BookingStatusBadge } from '@/components/StatusBadges';
 import { Button } from '@/components/ui/button';
 import { BedDouble, Users, Clock, Wrench, Plane, Car } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,8 +78,8 @@ export default function ManagerDashboard() {
       <p className="text-sm text-muted-foreground mb-6">{currentGH?.name}</p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Available Sections" value={available} icon={BedDouble} color="#22c55e" />
-        <StatCard title="Occupied Sections" value={occupied} icon={Users} color="#7f77dd" />
+        <StatCard title="Available Rooms" value={available} icon={BedDouble} color="#22c55e" />
+        <StatCard title="Occupied Rooms" value={occupied} icon={Users} color="#7f77dd" />
         <StatCard title="Pending Approval" value={pending} icon={Clock} color="#f59e0b" />
         <StatCard title="Under Maintenance" value={maintenance} icon={Wrench} color="#ef4444" />
       </div>
