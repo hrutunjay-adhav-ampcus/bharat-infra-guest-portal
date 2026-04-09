@@ -4,7 +4,7 @@ import { CategoryBadge, PriorityBadge } from '@/components/StatusBadges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Wrench, Clock, CheckCircle, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { Wrench, Clock, CheckCircle, AlertTriangle, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,18 +15,13 @@ export default function ManagerMaintenance() {
   const [createModal, setCreateModal] = useState(false);
   const [resolveModal, setResolveModal] = useState<string | null>(null);
   const [resolveNote, setResolveNote] = useState('');
-  const [deleteModal, setDeleteModal] = useState<string | null>(null);
   const [newTicket, setNewTicket] = useState({ roomId: '', sectionId: '', category: 'Electrical', priority: 'Medium' as 'Low' | 'Medium' | 'High', description: '', blockBookings: true });
 
   const ghTickets = tickets.filter(t => t.ghId === selectedGHId);
   const ghRooms = rooms.filter(r => r.ghId === selectedGHId);
 
-  // CHANGE 10A: "All" tab shows only open + in_progress
   const filtered = ghTickets
-    .filter(t => {
-      if (statusFilter === 'all') return t.status === 'open' || t.status === 'in_progress';
-      return t.status === statusFilter;
-    })
+    .filter(t => statusFilter === 'all' || t.status === statusFilter)
     .filter(t => categoryFilter === 'all' || t.category === categoryFilter);
 
   const categories = Array.from(new Set(ghTickets.map(t => t.category)));
@@ -59,30 +54,6 @@ export default function ManagerMaintenance() {
     toast.success(`Room ${rooms.find(r => r.id === ticket.roomId)?.number} Section ${ticket.sectionId} is now available`);
     setResolveModal(null);
     setResolveNote('');
-  };
-
-  // CHANGE 10B: Delete ticket
-  const confirmDeleteTicket = () => {
-    if (!deleteModal) return;
-    const ticket = tickets.find(t => t.id === deleteModal);
-    if (!ticket) return;
-
-    // Check if room section should become available
-    const otherOpenTickets = tickets.filter(t => t.id !== deleteModal && t.roomId === ticket.roomId && t.sectionId === ticket.sectionId && t.status !== 'resolved');
-    if (otherOpenTickets.length === 0) {
-      const room = rooms.find(r => r.id === ticket.roomId);
-      const section = room?.sections.find(s => s.sectionId === ticket.sectionId);
-      if (section?.status === 'maintenance') {
-        setRooms(prev => prev.map(r => r.id === ticket.roomId ? {
-          ...r, sections: r.sections.map(s => s.sectionId === ticket.sectionId ? { ...s, status: 'available' as const } : s)
-        } : r));
-        toast.success(`Room ${room?.number} Section ${ticket.sectionId} is now available.`);
-      }
-    }
-
-    setTickets(prev => prev.filter(t => t.id !== deleteModal));
-    toast.success('Maintenance ticket deleted.');
-    setDeleteModal(null);
   };
 
   const createTicket = () => {
@@ -131,7 +102,7 @@ export default function ManagerMaintenance() {
           {['all', 'open', 'in_progress', 'resolved'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border'}`}>
-              {s === 'all' ? 'All' : s.replace('_', ' ')}
+              {s.replace('_', ' ')}
             </button>
           ))}
         </div>
@@ -145,20 +116,15 @@ export default function ManagerMaintenance() {
         {filtered.map(t => {
           const room = rooms.find(r => r.id === t.roomId);
           return (
-            <div key={t.id} className="bg-card rounded-[10px] border border-border p-4 transition-all duration-300">
+            <div key={t.id} className="bg-card rounded-[10px] border border-border p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <span className="font-semibold">Room {room?.number}-{t.sectionId}</span>
                   <span className="text-xs text-muted-foreground ml-2">Floor {t.floor}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${t.status === 'open' ? 'bg-red-100 text-red-700' : t.status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                    {t.status.replace('_', ' ')}
-                  </span>
-                  <button onClick={() => setDeleteModal(t.id)} className="text-muted-foreground hover:text-red-500 transition-colors" title="Delete ticket">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${t.status === 'open' ? 'bg-red-100 text-red-700' : t.status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                  {t.status.replace('_', ' ')}
+                </span>
               </div>
               <div className="flex gap-2 mb-2">
                 <CategoryBadge category={t.category} />
@@ -237,26 +203,6 @@ export default function ManagerMaintenance() {
           </div>
         </div>
       )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteModal && (() => {
-        const ticket = tickets.find(t => t.id === deleteModal);
-        const room = rooms.find(r => r.id === ticket?.roomId);
-        return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card rounded-[10px] p-6 w-full max-w-md">
-              <h3 className="font-semibold mb-4">Delete Maintenance Ticket</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Delete this maintenance ticket for Room {room?.number}-{ticket?.sectionId}? This cannot be undone.
-              </p>
-              <div className="flex gap-2">
-                <Button onClick={confirmDeleteTicket} style={{ backgroundColor: '#ef4444', color: 'white' }}>Delete</Button>
-                <Button variant="outline" onClick={() => setDeleteModal(null)}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

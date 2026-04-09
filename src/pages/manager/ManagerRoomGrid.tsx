@@ -1,5 +1,6 @@
 import { useApp } from '@/context/AppContext';
 import RoomCard from '@/components/RoomCard';
+import { BookingStatusBadge } from '@/components/StatusBadges';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -109,16 +110,6 @@ export default function ManagerRoomGrid() {
     setDrawer(null);
   };
 
-  // CHANGE 2: Check if full unit booking is possible
-  const canBookFullUnit = (room: Room) => {
-    return room.sections.every(s => s.status === 'available');
-  };
-
-  const handleBookFullUnit = (room: Room) => {
-    if (!canBookFullUnit(room)) return;
-    navigate(`/manager/new-booking?mode=full_unit&roomId=${room.id}`);
-  };
-
   const ghTickets = tickets.filter(t => t.ghId === selectedGHId);
 
   if (!selectedGHId) return <div className="text-center py-20 text-muted-foreground">No guest houses assigned</div>;
@@ -199,21 +190,9 @@ export default function ManagerRoomGrid() {
                   <BedDouble className="h-4 w-4" /> Book This Section
                 </Button>
                 {drawer.room.bhkCount > 1 && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleBookFullUnit(drawer.room)}
-                      className="w-full"
-                      disabled={!canBookFullUnit(drawer.room)}
-                    >
-                      Book Entire {drawer.room.bhkCount}BHK
-                    </Button>
-                    {!canBookFullUnit(drawer.room) && (
-                      <p className="text-red-500 text-xs mt-2">
-                        Full unit booking unavailable — one or more sections are occupied, under maintenance, or pending approval.
-                      </p>
-                    )}
-                  </>
+                  <Button variant="outline" onClick={() => navigate('/manager/new-booking')} className="w-full">
+                    Book Entire {drawer.room.bhkCount}BHK
+                  </Button>
                 )}
                 {drawer.room.bhkCount > 1 && (
                   <div className="mt-4">

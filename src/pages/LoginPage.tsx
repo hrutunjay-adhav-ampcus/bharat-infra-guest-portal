@@ -7,22 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export default function LoginPage() {
   const { login } = useApp();
   const navigate = useNavigate();
   const [role, setRole] = useState<'admin' | 'manager'>('admin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [emailError, setEmailError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!EMAIL_REGEX.test(email)) {
-      setEmailError('Please enter a valid email address (e.g. name@domain.com)');
-      return;
-    }
     const success = login(role, email, password);
     if (success) {
       toast.success('Login successful');
@@ -65,20 +58,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setEmailError(''); }}
-              onBlur={() => {
-                if (email && !EMAIL_REGEX.test(email)) {
-                  setEmailError('Please enter a valid email address (e.g. name@domain.com)');
-                }
-              }}
-              placeholder={role === 'admin' ? 'admin@company.com' : 'manager@bharatinfra.com'}
-              required
-            />
-            {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={role === 'admin' ? 'admin@company.com' : 'manager@bharatinfra.com'} required />
           </div>
           <div>
             <Label htmlFor="password">Password</Label>

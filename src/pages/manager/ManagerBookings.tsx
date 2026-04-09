@@ -91,15 +91,6 @@ export default function ManagerBookings() {
     toast.success('Booking cancelled');
   };
 
-  // CHANGE 7: Safe room display helper
-  const getRoomDisplay = (allocatedRoom: string | null, allocatedSection: string | null) => {
-    if (!allocatedRoom) return '—';
-    const room = rooms.find(r => r.id === allocatedRoom);
-    if (!room) return '—';
-    if (!allocatedSection) return room.number;
-    return `${room.number}-${allocatedSection}`;
-  };
-
   const renderEmailPreview = (ref: string) => {
     const booking = bookings.find(b => b.ref === ref);
     if (!booking) return null;
@@ -122,7 +113,7 @@ export default function ManagerBookings() {
               <div key={i} className="border-b border-border pb-2">
                 <p>Guest: {g.name}</p>
                 <p>Guest House: {gh?.name}, {gh?.address}</p>
-                <p>Room: {getRoomDisplay(g.allocatedRoom, g.allocatedSection)}</p>
+                <p>Room: {rooms.find(r => r.id === g.allocatedRoom)?.number}-{g.allocatedSection}</p>
                 <p>Check-in: {booking.checkin} | Check-out: {booking.checkout}</p>
                 {g.pickup?.enabled && <p>Pickup: {g.pickup.location} at {g.pickup.time}. Vehicle: {g.pickup.vehicle}</p>}
                 {g.drop?.enabled && <p>Drop: {g.drop.location} at {g.drop.time}. Vehicle: {g.drop.vehicle}</p>}
@@ -181,7 +172,7 @@ export default function ManagerBookings() {
                 <tr key={b.ref} className="border-t border-border cursor-pointer hover:bg-muted/30" onClick={() => setExpandedRef(expandedRef === b.ref ? null : b.ref)}>
                   <td className="px-4 py-3 font-medium">{b.ref}</td>
                   <td className="px-4 py-3">{b.guests.map(g => g.name).join(', ')}</td>
-                  <td className="px-4 py-3">{b.guests.map(g => getRoomDisplay(g.allocatedRoom, g.allocatedSection)).join(', ')}</td>
+                  <td className="px-4 py-3">{b.guests.map(g => `${rooms.find(r => r.id === g.allocatedRoom)?.number || '?'}-${g.allocatedSection}`).join(', ')}</td>
                   <td className="px-4 py-3">{new Date(b.checkin).toLocaleDateString()}</td>
                   <td className="px-4 py-3">{new Date(b.checkout).toLocaleDateString()}</td>
                   <td className="px-4 py-3">{b.nights}</td>
@@ -204,7 +195,7 @@ export default function ManagerBookings() {
                           {b.guests.map((g, i) => (
                             <div key={i}>
                               <span className="font-medium">{g.name}</span> · {g.phone} · {g.company} · {g.type}
-                              · Room {getRoomDisplay(g.allocatedRoom, g.allocatedSection)}
+                              · Room {rooms.find(r => r.id === g.allocatedRoom)?.number}-{g.allocatedSection}
                               {g.pickup?.enabled && <span className="text-xs text-blue-600 ml-2">📍 Pickup: {g.pickup.location} at {g.pickup.time}</span>}
                               {g.drop?.enabled && <span className="text-xs text-amber-600 ml-2">📍 Drop: {g.drop.location} at {g.drop.time}</span>}
                             </div>

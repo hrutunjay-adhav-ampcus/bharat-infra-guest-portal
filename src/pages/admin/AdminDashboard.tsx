@@ -1,22 +1,21 @@
 import { useApp } from '@/context/AppContext';
 import StatCard from '@/components/StatCard';
 import { BookingStatusBadge } from '@/components/StatusBadges';
-import { Building2, Users, BedDouble, ClipboardCheck, Check, X } from 'lucide-react';
+import { Building2, Users, BedDouble, ClipboardCheck, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import SortDropdown, { sortData } from '@/components/SortDropdown';
 
 export default function AdminDashboard() {
   const { guestHouses, managers, rooms, bookings, setBookings, setRooms } = useApp();
   const pendingBookings = bookings.filter(b => b.status === 'pending');
   const totalRooms = rooms.length;
-  const [rejectModal, setRejectModal] = useState<{ ref: string; guestIdx: number } | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [countdowns, setCountdowns] = useState<Record<string, string>>({});
-
-  // CHANGE 4B: Date range filter instead of sort dropdown
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [sort, setSort] = useState('date_desc');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -40,88 +39,39 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [pendingBookings]);
 
-  // CHANGE 4B: Filter by date range
-  const filteredPending = pendingBookings.filter(b => {
-    if (!fromDate && !toDate) return true;
-    const checkinDate = b.checkin.split('T')[0];
-    if (fromDate && checkinDate < fromDate) return false;
-    if (toDate && checkinDate > toDate) return false;
-    return true;
-  });
-
-  // CHANGE 4A: Flatten to per-guest cards
-  const guestCards = filteredPending.flatMap(booking =>
-    booking.guests.map((guest, guestIdx) => ({
-      booking,
-      guest,
-      guestIdx,
-    }))
-  );
-
-  const approveGuest = (ref: string, guestIdx: number) => {
+  const approveBooking = (ref: string) => {
     const booking = bookings.find(b => b.ref === ref);
     if (!booking) return;
-    const guest = booking.guests[guestIdx];
-    if (!guest) return;
-
-    // Mark this guest's section as booked
-    if (guest.allocatedRoom && guest.allocatedSection) {
-      setRooms(prev => prev.map(room => room.id === guest.allocatedRoom ? {
-        ...room,
-        sections: room.sections.map(s => s.sectionId === guest.allocatedSection ? { ...s, status: 'booked' as const } : s)
-      } : room));
-    }
-
-    // Check if all guests in this booking are now approved (sections are booked)
-    // We need to check after this approval
-    const otherGuests = booking.guests.filter((_, i) => i !== guestIdx);
-    const allOthersApproved = otherGuests.every(g => {
-      if (!g.allocatedRoom || !g.allocatedSection) return true;
-      const room = rooms.find(r => r.id === g.allocatedRoom);
-      const section = room?.sections.find(s => s.sectionId === g.allocatedSection);
-      return section?.status === 'booked';
-    });
-
-    if (allOthersApproved) {
-      setBookings(prev => prev.map(b => b.ref === ref ? { ...b, status: 'confirmed' as const, emailSent: true } : b));
-      const emails = booking.guests.map(g => g.email).join(', ');
-      toast('Sending confirmation emails...');
-      setTimeout(() => toast.success(`✓ Confirmation emails sent to ${emails}`), 1500);
-    } else {
-      toast.success(`Guest ${guest.name} approved`);
-    }
+    setBookings(prev => prev.map(b => b.ref === ref ? { ...b, status: 'confirmed' as const, emailSent: true } : b));
+    setRooms(prev => prev.map(room => ({
+      ...room,
+      sections: room.sections.map(s => {
+        const isAllocated = booking.guests.some(g => g.allocatedRoom === room.id && g.allocatedSection === s.sectionId);
+        if (isAllocated) return { ...s, status: 'booked' as const };
+        return s;
+      })
+    })));
+    const emails = booking.guests.map(g => g.email).join(', ');
+    toast('Sending confirmation emails...');
+    setTimeout(() => toast.success(`✓ Confirmation emails sent to ${emails}`), 1500);
   };
 
-  const rejectGuest = () => {
+  const rejectBooking = () => {
     if (!rejectModal || rejectReason.length < 10) return;
-    const { ref, guestIdx } = rejectModal;
-    const booking = bookings.find(b => b.ref === ref);
+    const booking = bookings.find(b => b.ref === rejectModal);
     if (!booking) return;
-    const guest = booking.guests[guestIdx];
-
-    // Release this guest's section
-    if (guest.allocatedRoom && guest.allocatedSection) {
-      setRooms(prev => prev.map(room => room.id === guest.allocatedRoom ? {
-        ...room,
-        sections: room.sections.map(s => {
-          if (s.sectionId === guest.allocatedSection && (s.status === 'pending_approval' || s.status === 'booked')) {
-            return { ...s, status: 'available' as const, guestName: null, bookingRef: null };
-          }
-          return s;
-        })
-      } : room));
-    }
-
-    // Remove guest from booking
-    const updatedGuests = booking.guests.filter((_, i) => i !== guestIdx);
-    if (updatedGuests.length === 0) {
-      // All guests rejected
-      setBookings(prev => prev.map(b => b.ref === ref ? { ...b, status: 'rejected' as const, rejectionReason: rejectReason, guests: [] } : b));
-    } else {
-      setBookings(prev => prev.map(b => b.ref === ref ? { ...b, guests: updatedGuests } : b));
-    }
-
-    toast.success('Guest rejected. Notification sent to manager');
+    setBookings(prev => prev.map(b => b.ref === rejectModal ? { ...b, status: 'rejected' as const, rejectionReason: rejectReason } : b));
+    setRooms(prev => prev.map(room => ({
+      ...room,
+      sections: room.sections.map(s => {
+        const isAllocated = booking.guests.some(g => g.allocatedRoom === room.id && g.allocatedSection === s.sectionId);
+        if (isAllocated && (s.status === 'pending_approval' || s.status === 'booked')) {
+          return { ...s, status: 'available' as const, guestName: null, bookingRef: null };
+        }
+        return s;
+      })
+    })));
+    toast.success('Rejection notification sent to manager');
     setRejectModal(null);
     setRejectReason('');
   };
@@ -131,10 +81,7 @@ export default function AdminDashboard() {
     return managers.find(m => m.id === gh?.managerId);
   };
 
-  const clearDateFilter = () => {
-    setFromDate('');
-    setToDate('');
-  };
+  const sortedPending = sortData(pendingBookings, sort);
 
   return (
     <div>
@@ -149,60 +96,90 @@ export default function AdminDashboard() {
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Pending Booking Requests</h2>
-        <div className="flex items-center gap-2">
-          <input type="date" className="border border-border rounded-md px-3 py-1.5 text-sm" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="From" />
-          <input type="date" className="border border-border rounded-md px-3 py-1.5 text-sm" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="To" />
-          <Button size="sm" onClick={() => {}} variant="outline" disabled={!fromDate && !toDate}>Apply Filter</Button>
-          {(fromDate || toDate) && (
-            <button onClick={clearDateFilter} className="text-xs text-primary hover:underline">Clear</button>
-          )}
-        </div>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
-
-      {guestCards.length === 0 ? (
+      {sortedPending.length === 0 ? (
         <div className="bg-card rounded-[10px] border border-border p-8 text-center text-muted-foreground">No pending requests</div>
       ) : (
         <div className="space-y-4 mb-8">
-          {guestCards.map(({ booking, guest, guestIdx }) => {
+          {sortedPending.map(booking => {
             const mgr = getGHManager(booking.ghId);
             const gh = guestHouses.find(g => g.id === booking.ghId);
             const countdown = countdowns[booking.ref] || '';
             const isExpiringSoon = booking.pendingExpiresAt && (booking.pendingExpiresAt - Date.now()) < 30 * 60 * 1000;
-            const room = rooms.find(r => r.id === guest.allocatedRoom);
 
             return (
-              <div key={`${booking.ref}-${guestIdx}`} className="bg-card rounded-[10px] border border-border p-5">
+              <div key={booking.ref} className="bg-card rounded-[10px] border border-border p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-lg">{guest.name}</span>
+                      <span className="font-semibold">{booking.ref}</span>
                       <BookingStatusBadge status={booking.status} />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {booking.ref} · {gh?.name} · Manager: {mgr?.name}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{gh?.name} · Manager: {mgr?.name}</p>
                   </div>
                   <div className={`text-sm font-medium px-3 py-1 rounded-full ${isExpiringSoon ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                     Expires in {countdown}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                  <div><span className="text-muted-foreground">Phone:</span> {guest.phone}</div>
-                  <div><span className="text-muted-foreground">Company:</span> {guest.company}</div>
-                  <div><span className="text-muted-foreground">Type:</span> <span className="capitalize">{guest.type}</span></div>
-                  <div><span className="text-muted-foreground">Room:</span> {room?.number || '—'}-{guest.allocatedSection || '—'}</div>
+                <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                  <div><span className="text-muted-foreground">Guests:</span> {booking.guests.length}</div>
+                  <div><span className="text-muted-foreground">Rooms:</span> {booking.guests.map(g => `${rooms.find(r => r.id === g.allocatedRoom)?.number || '?'}-${g.allocatedSection}`).join(', ')}</div>
+                  <div><span className="text-muted-foreground">Purpose:</span> {booking.purpose}</div>
+                </div>
+                <div className="text-sm text-muted-foreground mb-3">
+                  Check-in: {new Date(booking.checkin).toLocaleDateString()} → Check-out: {new Date(booking.checkout).toLocaleDateString()} ({booking.nights} nights)
                 </div>
 
-                <div className="text-sm text-muted-foreground mb-3">
-                  Check-in: {new Date(booking.checkin).toLocaleDateString()} → Check-out: {new Date(booking.checkout).toLocaleDateString()} ({booking.nights} nights) · Purpose: {booking.purpose}
-                </div>
+                {booking.pickup.enabled && (
+                  <div className="text-sm mb-1">🚗 Pickup: {booking.pickup.location} at {booking.pickup.time} ({booking.pickup.vehicle})</div>
+                )}
+                {booking.drop.enabled && (
+                  <div className="text-sm mb-3">🚗 Drop: {booking.drop.location} at {booking.drop.time} ({booking.drop.vehicle})</div>
+                )}
+
+                <button
+                  onClick={() => setExpanded(prev => ({ ...prev, [booking.ref]: !prev[booking.ref] }))}
+                  className="text-sm font-medium flex items-center gap-1 mb-3"
+                  style={{ color: '#6366f1' }}
+                >
+                  {expanded[booking.ref] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  View Guest Details
+                </button>
+
+                {expanded[booking.ref] && (
+                  <div className="border border-border rounded-lg overflow-hidden mb-3">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium">Name</th>
+                          <th className="text-left px-3 py-2 font-medium">Phone</th>
+                          <th className="text-left px-3 py-2 font-medium">Company</th>
+                          <th className="text-left px-3 py-2 font-medium">Type</th>
+                          <th className="text-left px-3 py-2 font-medium">Room/Section</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {booking.guests.map((g, i) => (
+                          <tr key={i} className="border-t border-border">
+                            <td className="px-3 py-2">{g.name}</td>
+                            <td className="px-3 py-2">{g.phone}</td>
+                            <td className="px-3 py-2">{g.company}</td>
+                            <td className="px-3 py-2 capitalize">{g.type}</td>
+                            <td className="px-3 py-2">{rooms.find(r => r.id === g.allocatedRoom)?.number || '-'}-{g.allocatedSection || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 <div className="flex gap-2">
-                  <Button onClick={() => approveGuest(booking.ref, guestIdx)} className="gap-1" style={{ backgroundColor: '#22c55e' }}>
+                  <Button onClick={() => approveBooking(booking.ref)} className="gap-1" style={{ backgroundColor: '#22c55e' }}>
                     <Check className="h-4 w-4" /> Approve
                   </Button>
-                  <Button onClick={() => { setRejectModal({ ref: booking.ref, guestIdx }); setRejectReason(''); }} variant="outline" className="gap-1" style={{ borderColor: '#ef4444', color: '#ef4444' }}>
+                  <Button onClick={() => { setRejectModal(booking.ref); setRejectReason(''); }} variant="outline" className="gap-1" style={{ borderColor: '#ef4444', color: '#ef4444' }}>
                     <X className="h-4 w-4" /> Reject
                   </Button>
                 </div>
@@ -252,7 +229,7 @@ export default function AdminDashboard() {
       {rejectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card rounded-[10px] p-6 w-full max-w-md">
-            <h3 className="font-semibold mb-4">Reject Guest</h3>
+            <h3 className="font-semibold mb-4">Reject Booking {rejectModal}</h3>
             <label className="text-sm font-medium">Rejection Reason (min 10 chars)</label>
             <textarea
               className="w-full mt-2 border border-border rounded-md p-2 text-sm min-h-[100px]"
@@ -261,7 +238,7 @@ export default function AdminDashboard() {
               placeholder="Enter reason for rejection..."
             />
             <div className="flex gap-2 mt-4">
-              <Button onClick={rejectGuest} disabled={rejectReason.length < 10} style={{ backgroundColor: '#ef4444', color: 'white' }}>
+              <Button onClick={rejectBooking} disabled={rejectReason.length < 10} style={{ backgroundColor: '#ef4444', color: 'white' }}>
                 Confirm Rejection
               </Button>
               <Button variant="outline" onClick={() => setRejectModal(null)}>Cancel</Button>
